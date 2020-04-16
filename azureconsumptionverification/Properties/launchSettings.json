@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "azureconsumptionverification": {
+      "commandName": "Project",
+      "commandLineArgs": ""
+    }
+  }
+}
