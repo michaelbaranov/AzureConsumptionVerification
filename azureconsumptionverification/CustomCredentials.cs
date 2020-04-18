@@ -1,8 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Net.Http;
+﻿using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Management.ResourceManager.Fluent;
@@ -26,7 +23,8 @@ namespace AzureConsumptionVerification
             _tenantId = tenantId;
         }
 
-        public override async Task ProcessHttpRequestAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        public override async Task ProcessHttpRequestAsync(HttpRequestMessage request,
+            CancellationToken cancellationToken)
         {
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _authenticationToken);
             await base.ProcessHttpRequestAsync(request, cancellationToken);

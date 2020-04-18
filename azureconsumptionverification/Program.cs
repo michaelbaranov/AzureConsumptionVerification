@@ -1,23 +1,23 @@
-﻿using System;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 
 namespace AzureConsumptionVerification
 {
-    class Program
+    internal class Program
     {
-        static void Main(string[] args)
+        private static void Main(string[] args)
         {
-            string clientId = args[0];
-            string clientSecret = args[1];
-            string tenantId = args[2];
-            string subscription = args[3];
+            var clientId = args[0];
+            var clientSecret = args[1];
+            var tenantId = args[2];
+            var subscription = args[3];
 
             var credentials = new CustomCredentials(clientId, clientSecret, tenantId);
             var consumption = new ConsumptionProvider(credentials, subscription);
             var usageDetails = consumption.GetConsumptionAsync(4).GetAwaiter().GetResult();
 
             var consumptionAnalyzer = new ConsumptionAnalyzer(new ActivityLogProvider(credentials, subscription));
-            var report = consumptionAnalyzer.AnalyzeConsumptionForDeletedResources(usageDetails).GetAwaiter().GetResult();
+            var report = consumptionAnalyzer.AnalyzeConsumptionForDeletedResources(usageDetails).GetAwaiter()
+                .GetResult();
 
             var reportPath = CsvReporter.WriteReport(report);
 

@@ -1,7 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using Microsoft.Azure.Management.AppService.Fluent.Models;
 
 namespace AzureConsumptionVerification
 {
@@ -15,7 +14,7 @@ namespace AzureConsumptionVerification
         }
 
         public int Count => _resources.Count;
-        
+
         public void AddResource(BilledResources resource)
         {
             _resources.Add(resource);
