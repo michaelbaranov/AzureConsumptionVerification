@@ -24,9 +24,17 @@ namespace AzureConsumptionVerification
             var report = new ConsumptionAnalysisReport();
             // Fist group by resource, get deletion date, sum numbers after deletion
 
-            var processingPool = new ConcurrentQueue<ProcessingTask>(usage.Where(u => u.PretaxCost > 0)
-                .GroupBy(r => r.InstanceId).Select(grp => grp.First().InstanceId)
-                .Select(p => new ProcessingTask {ResourceId = p}));
+            // Get resources with non - zero costs
+            var processingPool = new ConcurrentQueue<ProcessingTask>(usage
+                .Where(u => u.PretaxCost > 0)
+                .GroupBy(r => r.InstanceId)
+                .Select(u =>
+                    new {
+                        ResourceId = u.First().InstanceId,
+                        Costs = u.Sum(c => c.PretaxCost)
+                    })
+                .Where(p => p.Costs > 0)
+                .Select(t => new ProcessingTask {ResourceId = t.ResourceId}));
             var totalResources = processingPool.Count;
 
             // Running processing in parallel threads
