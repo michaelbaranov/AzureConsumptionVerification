@@ -14,10 +14,10 @@ namespace AzureConsumptionVerification
 
             var credentials = new CustomCredentials(clientId, clientSecret, tenantId);
             var consumption = new ConsumptionProvider(credentials, subscription);
-            var usageDetails = consumption.GetConsumptionAsync().GetAwaiter().GetResult();
+            var usageDetails = consumption.GetConsumptionAsync(4).GetAwaiter().GetResult();
 
             var consumptionAnalyzer = new ConsumptionAnalyzer(new ActivityLogProvider(credentials, subscription));
-            var report = consumptionAnalyzer.AnalyzeConsumptionForDeletedResources(usageDetails);
+            var report = consumptionAnalyzer.AnalyzeConsumptionForDeletedResources(usageDetails).GetAwaiter().GetResult();
 
             var reportPath = CsvReporter.WriteReport(report);
 

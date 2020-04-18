@@ -15,5 +15,7 @@ namespace AzureConsumptionVerification
         public DateTime? UsageStart;
         public DateTime? ActivityCreated;
         public DateTime? ActivityDeleted;
+        public string DeleteOperationId;
+        public decimal? Overage;
     }
 }
