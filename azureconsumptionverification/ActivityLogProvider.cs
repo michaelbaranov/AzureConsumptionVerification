@@ -12,23 +12,21 @@ namespace AzureConsumptionVerification
     {
         private readonly ServiceClientCredentials _credentials;
         private readonly string _subscription;
-        private readonly IAzure _azure;
-        private IEnumerable<IEventData> _eventData;
 
         public ActivityLogProvider(ServiceClientCredentials credentials, string subscription)
         {
             _credentials = credentials;
             _subscription = subscription;
-            _azure = Azure
-                .Configure()
-                .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
-                .Authenticate(((CustomCredentials) _credentials).ToAzureCredentials())
-                .WithSubscription(_subscription);
         }
 
         private IEnumerable<IEventData> GetEventsForResource(string resourceId)
         {
-            return _eventData = _azure.ActivityLogs.DefineQuery()
+            return Azure
+                .Configure()
+                .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
+                .Authenticate(((CustomCredentials)_credentials).ToAzureCredentials())
+                .WithSubscription(_subscription)
+                .ActivityLogs.DefineQuery()
                 .StartingFrom(DateTime.UtcNow.AddDays(-90))
                 .EndsBefore(DateTime.UtcNow)
                 .WithResponseProperties(EventDataPropertyName.EventTimestamp, EventDataPropertyName.OperationName,
