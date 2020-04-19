@@ -32,7 +32,7 @@ namespace AzureConsumptionVerification
                 {
                     var result = await response;
                     usageDetails.AddRange(result.ToList());
-                    Console.WriteLine($"Obtaining Billing information, done {usageDetails.Count} records received");
+                    Console.WriteLine($"Obtaining Billing information, done {result.Count()} records received, total {usageDetails.Count}");
 
                     if (string.IsNullOrEmpty(result.NextPageLink)) break;
 
