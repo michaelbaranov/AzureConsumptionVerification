@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Management.Consumption.Models;
@@ -22,7 +24,6 @@ namespace AzureConsumptionVerification
         public async Task<ConsumptionAnalysisReport> AnalyzeConsumptionForDeletedResources(IList<UsageDetail> usage)
         {
             var report = new ConsumptionAnalysisReport();
-            // Fist group by resource, get deletion date, sum numbers after deletion
 
             // Get resources with non - zero costs
             var processingPool = new ConcurrentQueue<ProcessingTask>(usage
@@ -35,7 +36,7 @@ namespace AzureConsumptionVerification
                 .Where(p => p.Costs > 0)
                 .Select(t => new ProcessingTask {ResourceId = t.ResourceId}));
             var totalResources = processingPool.Count;
-
+            Console.WriteLine($"Retrieved {totalResources} resources with non-zero billing");
             // Running processing in parallel threads
             var tasks = new List<Task>(ProcessingThreads);
             for (var i = 0; i < ProcessingThreads; i++)
@@ -52,8 +53,11 @@ namespace AzureConsumptionVerification
                                 continue;
                             }
 
-                            var deleteActivity = _activityLogProvider.GetResourceDeletionDate(task.ResourceId);
-
+                            // Delete event is missing for some resources, so use resource group deletion date
+                            var deleteActivity = _activityLogProvider.GetResourceDeletionDate(task.ResourceId) ??
+                                                 _activityLogProvider.GetResourceGroupDeletionDate(GetResourceGroupName(task.ResourceId));
+                            
+                            // Calculate overage as sum of billing records for dates past deletion
                             report.AddResource(new BilledResources
                             {
                                 Currency = usage.First(r => r.InstanceId == task.ResourceId).Currency,
@@ -89,6 +93,11 @@ namespace AzureConsumptionVerification
             await Task.WhenAll(tasks);
 
             return report;
+        }
+
+        private string GetResourceGroupName(string resourceId)
+        {
+            return Regex.Match(resourceId, "/resourceGroups/(.*)/providers", RegexOptions.IgnoreCase).Groups[1].Value;
         }
 
         internal class ProcessingTask

@@ -37,6 +37,38 @@ namespace AzureConsumptionVerification
                 .GetResult();
         }
 
+        private IEnumerable<IEventData> GetEventsForResourceGroup(string resourceGroupName)
+        {
+            return Azure
+                .Configure()
+                .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
+                .Authenticate(((CustomCredentials)_credentials).ToAzureCredentials())
+                .WithSubscription(_subscription)
+                .ActivityLogs.DefineQuery()
+                .StartingFrom(DateTime.UtcNow.AddDays(-90))
+                .EndsBefore(DateTime.UtcNow)
+                .WithResponseProperties(EventDataPropertyName.EventTimestamp, EventDataPropertyName.OperationName,
+                    EventDataPropertyName.Status, EventDataPropertyName.OperationId)
+                .FilterByResourceGroup(resourceGroupName)
+                .ExecuteAsync()
+                .GetAwaiter()
+                .GetResult();
+        }
+
+        public DeleteOperation GetResourceGroupDeletionDate(string resourceGroupName)
+        {
+            var events = GetEventsForResourceGroup(resourceGroupName);
+            var deleteEvents = events.Where(e =>
+                string.Equals(e.OperationName.Value, "Microsoft.Resources/subscriptions/resourcegroups/delete", StringComparison.OrdinalIgnoreCase)
+                && e.Status.Value == "Succeeded").ToList();
+
+            var eventData = deleteEvents.FirstOrDefault();
+
+            return eventData == null
+                ? null
+                : new DeleteOperation { OperationId = eventData.OperationId, Date = eventData.EventTimestamp };
+        }
+
         public DeleteOperation GetResourceDeletionDate(string resourceId)
         {
             var events = GetEventsForResource(resourceId);
