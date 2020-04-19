@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 
 namespace AzureConsumptionVerification
 {
@@ -16,7 +17,7 @@ namespace AzureConsumptionVerification
                     writer.WriteLine($"{billedResource.InstanceName}," +
                                      $"{billedResource.Id}," +
                                      $"{billedResource.ConsumedService}," +
-                                     $"{billedResource.PretaxCost?.ToString("0.00")}," +
+                                     $"{billedResource.PretaxCost}," +
                                      $"{billedResource.Currency}," +
                                      $"{billedResource.UsageStart}," +
                                      $"{billedResource.UsageEnd}," +

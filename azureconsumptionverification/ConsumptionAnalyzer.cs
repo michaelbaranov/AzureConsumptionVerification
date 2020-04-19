@@ -26,7 +26,6 @@ namespace AzureConsumptionVerification
 
             // Get resources with non - zero costs
             var processingPool = new ConcurrentQueue<ProcessingTask>(usage
-                .Where(u => u.PretaxCost > 0)
                 .GroupBy(r => r.InstanceId)
                 .Select(u =>
                     new {
