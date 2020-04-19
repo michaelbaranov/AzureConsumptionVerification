@@ -79,6 +79,7 @@ namespace AzureConsumptionVerification
                         }
                         catch (Exception e)
                         {
+                            // Activity API sometimes fails with timeouts, need to retry
                             task.Exceptions.Add(e);
                             processingPool.Enqueue(task);
                         }
