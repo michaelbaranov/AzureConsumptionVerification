@@ -17,5 +17,5 @@ Expected parameters:
  
 Example:
 ``` 
-AzureConsumptionVerification -cilentId=124d8317-dd0a-47f8-b630-c4839eb1602d -clientSecret=ObTY9A53gEB3_TgUFICK=gqX_NedhlE- -tenantId=91700184-c314-4dc9-bb7e-a411df456a1e -subscription=38cadfad-6513-4396-af97-8606962edfa1
+AzureConsumptionVerification -cilentId=124d8317-dd0a-47f8-b630-c4839eb1602d -clientSecret=ObTY9A53gEB3_TgUFICK=gqX_NedhlE- -tenantId=91700184-c314-4dc9-bb7e-a411df456a1e -subscriptionId=38cadfad-6513-4396-af97-8606962edfa1
 ```
