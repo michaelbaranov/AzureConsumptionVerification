@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Azure.Management.Fluent;
 using Microsoft.Azure.Management.Monitor.Fluent.Models;
-using Microsoft.Azure.Management.ResourceManager.Fluent.Core;
 using Microsoft.Rest;
 
 namespace AzureConsumptionVerification
@@ -23,7 +22,6 @@ namespace AzureConsumptionVerification
         {
             return Azure
                 .Configure()
-                .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
                 .Authenticate(((CustomCredentials)_credentials).ToAzureCredentials())
                 .WithSubscription(_subscription)
                 .ActivityLogs.DefineQuery()
@@ -33,6 +31,7 @@ namespace AzureConsumptionVerification
                     EventDataPropertyName.Status, EventDataPropertyName.OperationId)
                 .FilterByResource(resourceId)
                 .ExecuteAsync()
+                .ConfigureAwait(false)
                 .GetAwaiter()
                 .GetResult();
         }
@@ -41,7 +40,6 @@ namespace AzureConsumptionVerification
         {
             return Azure
                 .Configure()
-                .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
                 .Authenticate(((CustomCredentials)_credentials).ToAzureCredentials())
                 .WithSubscription(_subscription)
                 .ActivityLogs.DefineQuery()
@@ -51,6 +49,7 @@ namespace AzureConsumptionVerification
                     EventDataPropertyName.Status, EventDataPropertyName.OperationId)
                 .FilterByResourceGroup(resourceGroupName)
                 .ExecuteAsync()
+                .ConfigureAwait(false)
                 .GetAwaiter()
                 .GetResult();
         }

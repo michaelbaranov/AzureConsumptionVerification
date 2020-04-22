@@ -41,7 +41,7 @@ namespace AzureConsumptionVerification
             var tasks = new List<Task>(ProcessingThreads);
             for (var i = 0; i < ProcessingThreads; i++)
             {
-                var task = new Task(() =>
+                var task = Task.Run(() =>
                 {
                     ProcessingTask task = null;
                     while (processingPool.TryDequeue(out task))
@@ -84,11 +84,10 @@ namespace AzureConsumptionVerification
                             processingPool.Enqueue(task);
                         }
                 });
-                task.Start();
                 tasks.Add(task);
             }
 
-            await using var timer = new Timer(data =>
+            using var timer = new Timer(data =>
                 Console.WriteLine($"Processed ... {report.Count} of {totalResources}"), null, 0, 10000);
 
             await Task.WhenAll(tasks);
