@@ -60,6 +60,7 @@ namespace AzureConsumptionVerification
                             // Calculate overage as sum of billing records for dates past deletion
                             report.AddResource(new BilledResources
                             {
+                                SubscriptionId = usage.First(r => r.InstanceId == task.ResourceId).SubscriptionGuid,
                                 Currency = usage.First(r => r.InstanceId == task.ResourceId).Currency,
                                 Id = task.ResourceId,
                                 InstanceName = usage.First(r => r.InstanceId == task.ResourceId).InstanceName,

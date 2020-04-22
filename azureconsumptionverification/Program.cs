@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.IO;
 using Mono.Options;
 
 namespace AzureConsumptionVerification
@@ -14,6 +15,8 @@ namespace AzureConsumptionVerification
             var subscriptionId = string.Empty;
             var showHelp = false;
             var numberOfMonthsToAnalyze = 1;
+            var outputFolder = Path.GetTempPath();
+            var openReport = false;
 
             var optionSet = new OptionSet()
                 .Add("clientId=", o => clientId = o)
@@ -21,6 +24,8 @@ namespace AzureConsumptionVerification
                 .Add("tenantId=", o => tenantId = o)
                 .Add("subscriptionId=", o => subscriptionId = o)
                 .Add("numberOfMonths=", o => numberOfMonthsToAnalyze = int.Parse(o))
+                .Add("outputFolder=", o => outputFolder = o)
+                .Add("openReport", o => openReport = o != null)
                 .Add("h|?|help", o => showHelp = o != null);
 
             optionSet.Parse(args);
@@ -46,11 +51,16 @@ namespace AzureConsumptionVerification
             var report = consumptionAnalyzer.AnalyzeConsumptionForDeletedResources(usageDetails).GetAwaiter()
                 .GetResult();
 
-            var reportPath = CsvReporter.WriteReport(report, subscriptionId);
+            var reportFile = Path.Combine(outputFolder, $"consumption_{subscriptionId}.csv");
+            
+            CsvReporter.WriteReport(report, reportFile);
 
             // Open report
-            var process = new Process {StartInfo = new ProcessStartInfo(reportPath) {UseShellExecute = true}};
-            process.Start();
+            if (openReport)
+            {
+                var process = new Process { StartInfo = new ProcessStartInfo(reportFile) { UseShellExecute = true } };
+                process.Start();
+            }
         }
 
         private static void ShowHelp()
@@ -62,11 +72,17 @@ namespace AzureConsumptionVerification
             Console.WriteLine(" -subscriptionId");
             Console.WriteLine(
                 " -numberOfMonths [optional, default 1] number of months to analyze, due to Activity log API limitation in 90 days max value is 4");
+            Console.WriteLine(
+                " -outputFolder [optional, default %TEMP%] folder to save report");
+            Console.WriteLine(
+                " -openReport [optional, default <empty>] switch if enabled opens generated report");
             Console.WriteLine("Example:");
             Console.WriteLine("AzureConsumptionVerification -cilentId=124d8317-dd0a-47f8-b630-c4839eb1602d " +
                               "-clientSecret=ObTY9A53gEB3_TgUFICK=gqX_NedhlE- " +
                               "-tenantId=91700184-c314-4dc9-bb7e-a411df456a1e " +
-                              "-subscriptionId=38cadfad-6513-4396-af97-8606962edfa1");
+                              "-subscriptionId=38cadfad-6513-4396-af97-8606962edfa1" +
+                              "-outputFolder=c:\\reports" +
+                              "-openReport ");
         }
     }
 }
