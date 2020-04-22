@@ -6,19 +6,29 @@ namespace AzureConsumptionVerification
 {
     internal class CsvReporter
     {
-        public static string WriteReport(ConsumptionAnalysisReport report)
+        public static string WriteReport(ConsumptionAnalysisReport report, string subscriptionId)
         {
-            var reportFileName = GetTempFileName();
+            var reportFileName = GetTempFileName(subscriptionId);
             using (var writer = File.CreateText(reportFileName))
             {
+                var resources = report.GetResources();
+                var currency = resources.GroupBy(r => r.Currency).FirstOrDefault().Key;
+
                 writer.WriteLine(
-                    "Resource name,Resource ID,Service Type,Cost,Currency,Billing Start,Billing End,Deleted,DeleteOperationId,Overage");
-                foreach (var billedResource in report.GetResources())
-                    writer.WriteLine($"{billedResource.InstanceName}," +
-                                     $"{billedResource.Id}," +
+                    $"Resource name," +
+                    $"Resource ID," +
+                    $"Service Type," +
+                    $"Cost {currency}," +
+                    $"Billing Start," +
+                    $"Billing End," +
+                    $"Actual resource deletion date," +
+                    $"DeleteOperationId," +
+                    $"Overage {currency}");
+                foreach (var billedResource in resources)
+                    writer.WriteLine($"{billedResource.InstanceName.Replace(',','_')}," +
+                                     $"{billedResource.Id.Replace(',', '_')}," +
                                      $"{billedResource.ConsumedService}," +
                                      $"{billedResource.PretaxCost}," +
-                                     $"{billedResource.Currency}," +
                                      $"{billedResource.UsageStart}," +
                                      $"{billedResource.UsageEnd}," +
                                      $"{billedResource.ActivityDeleted}," +
@@ -29,9 +39,9 @@ namespace AzureConsumptionVerification
             return reportFileName;
         }
 
-        private static string GetTempFileName()
+        private static string GetTempFileName(string subscriptionId)
         {
-            return Path.Combine(Path.GetTempPath(), $"consumption_{new Random().Next(1000)}.csv");
+            return Path.Combine(Path.GetTempPath(), $"consumption_{subscriptionId}_{new Random().Next(1000)}.csv");
         }
     }
 }

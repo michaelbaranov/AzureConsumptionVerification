@@ -46,7 +46,7 @@ namespace AzureConsumptionVerification
             var report = consumptionAnalyzer.AnalyzeConsumptionForDeletedResources(usageDetails).GetAwaiter()
                 .GetResult();
 
-            var reportPath = CsvReporter.WriteReport(report);
+            var reportPath = CsvReporter.WriteReport(report, subscriptionId);
 
             // Open report
             var process = new Process {StartInfo = new ProcessStartInfo(reportPath) {UseShellExecute = true}};
