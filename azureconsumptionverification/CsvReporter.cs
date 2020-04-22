@@ -15,6 +15,7 @@ namespace AzureConsumptionVerification
                 var currency = resources.GroupBy(r => r.Currency).FirstOrDefault().Key;
 
                 writer.WriteLine(
+                    $"SubscriptionId," +
                     $"Resource name," +
                     $"Resource ID," +
                     $"Service Type," +
@@ -25,7 +26,8 @@ namespace AzureConsumptionVerification
                     $"DeleteOperationId," +
                     $"Overage {currency}");
                 foreach (var billedResource in resources)
-                    writer.WriteLine($"{billedResource.InstanceName.Replace(',','_')}," +
+                    writer.WriteLine($"{subscriptionId}," + 
+                                     $"{billedResource.InstanceName.Replace(',','_')}," +
                                      $"{billedResource.Id.Replace(',', '_')}," +
                                      $"{billedResource.ConsumedService}," +
                                      $"{billedResource.PretaxCost}," +
