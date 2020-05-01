@@ -58,12 +58,13 @@ namespace AzureConsumptionVerification
 
             await Process(credentials, subscriptions, numberOfMonthsToAnalyze, outputFolder);
 
+            var reportFile = CsvReporter.MergeReports(outputFolder);
             // Open report
-            //if (openReport)
-            //{
-            //    var process = new Process { StartInfo = new ProcessStartInfo(reportFile) { UseShellExecute = true } };
-            //    process.Start();
-            //}
+            if (openReport)
+            {
+                var process = new Process { StartInfo = new ProcessStartInfo(reportFile) { UseShellExecute = true } };
+                process.Start();
+            }
 
             return 0;
         }
