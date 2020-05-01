@@ -108,6 +108,11 @@ namespace AzureConsumptionVerification
                         {
                             var consumption = new ConsumptionProvider(credentials, subscriptionId);
                             var usageDetails = consumption.GetConsumptionAsync(numberOfMonthsToAnalyze).GetAwaiter().GetResult();
+                            if (usageDetails.Count == 0)
+                            {
+                                Console.WriteLine($"No billing information found for subscription {subscriptionId}");
+                                continue;
+                            }
 
                             var consumptionAnalyzer = new ConsumptionAnalyzer(new ActivityLogProvider(credentials, subscriptionId), subscriptionId);
                             var report = consumptionAnalyzer.AnalyzeConsumptionForDeletedResources(usageDetails).GetAwaiter()

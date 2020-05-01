@@ -9,7 +9,7 @@ namespace AzureConsumptionVerification
         {
             using var writer = File.CreateText(outputFile);
             var resources = report.GetResources();
-            var currency = resources.GroupBy(r => r.Currency).FirstOrDefault().Key;
+            var currency = resources.GroupBy(r => r?.Currency).FirstOrDefault()?.Key;
 
             writer.WriteLine(
                 $"SubscriptionId," +
