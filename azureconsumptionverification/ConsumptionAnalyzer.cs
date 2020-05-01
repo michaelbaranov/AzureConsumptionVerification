@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -12,13 +11,15 @@ namespace AzureConsumptionVerification
 {
     internal class ConsumptionAnalyzer
     {
-        private const int ProcessingThreads = 20;
+        private const int ProcessingThreads = 100;
         private const int ProcessingRetryCount = 5;
         private readonly ActivityLogProvider _activityLogProvider;
+        private readonly string _subscriptionId;
 
-        public ConsumptionAnalyzer(ActivityLogProvider activityLogProvider)
+        public ConsumptionAnalyzer(ActivityLogProvider activityLogProvider, string subscriptionId)
         {
             _activityLogProvider = activityLogProvider;
+            _subscriptionId = subscriptionId;
         }
 
         public async Task<ConsumptionAnalysisReport> AnalyzeConsumptionForDeletedResources(IList<UsageDetail> usage)
@@ -36,7 +37,7 @@ namespace AzureConsumptionVerification
                 .Where(p => p.Costs > 0)
                 .Select(t => new ProcessingTask {ResourceId = t.ResourceId}));
             var totalResources = processingPool.Count;
-            Console.WriteLine($"Retrieved {totalResources} resources with non-zero billing");
+            Console.WriteLine($"Subscription ${_subscriptionId}. Retrieved {totalResources} resources with non-zero billing");
             // Running processing in parallel threads
             var tasks = new List<Task>(ProcessingThreads);
             for (var i = 0; i < ProcessingThreads; i++)
@@ -49,7 +50,7 @@ namespace AzureConsumptionVerification
                         {
                             if (task.Exceptions.Count > ProcessingRetryCount)
                             {
-                                Console.WriteLine($"Failed to process {task.ResourceId}");
+                                Console.WriteLine($"Subscription ${_subscriptionId}. Failed to process {task.ResourceId}");
                                 continue;
                             }
 
@@ -89,7 +90,7 @@ namespace AzureConsumptionVerification
             }
 
             using var timer = new Timer(data =>
-                Console.WriteLine($"Processed ... {report.Count} of {totalResources}"), null, 0, 10000);
+                Console.WriteLine($"Subscription ${_subscriptionId}. Processed ... {report.Count} of {totalResources}"), null, 0, 10000);
 
             await Task.WhenAll(tasks);
 
@@ -101,7 +102,7 @@ namespace AzureConsumptionVerification
             return Regex.Match(resourceId, "/resourceGroups/(.*)/providers", RegexOptions.IgnoreCase).Groups[1].Value;
         }
 
-        internal class ProcessingTask
+        private class ProcessingTask
         {
             public List<Exception> Exceptions = new List<Exception>();
             public string ResourceId;

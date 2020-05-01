@@ -10,29 +10,31 @@ namespace AzureConsumptionVerification
 {
     public class ConsumptionProvider
     {
+        private readonly string _subscriptionId;
         private readonly ConsumptionManagementClient _client;
 
-        public ConsumptionProvider(ServiceClientCredentials credentials, string subscription)
+        public ConsumptionProvider(ServiceClientCredentials credentials, string subscriptionId)
         {
-            _client = new ConsumptionManagementClient(credentials) {SubscriptionId = subscription};
+            _subscriptionId = subscriptionId;
+            _client = new ConsumptionManagementClient(credentials) {SubscriptionId = _subscriptionId};
         }
 
         public async Task<IList<UsageDetail>> GetConsumptionAsync(int numberOfMonths)
         {
-            Console.WriteLine("Obtaining Billing information, this might take a while");
+            Console.WriteLine($"Subscription {_subscriptionId}. Obtaining Billing information, this might take a while");
             var usageDetails = new List<UsageDetail>();
 
             for (var i = 0; i < numberOfMonths; i++)
             {
                 var billingPeriodName = DateTime.UtcNow.AddMonths(-i).ToString("yyyyMM01");
-                Console.WriteLine($"Getting data for billing period {billingPeriodName}");
+                Console.WriteLine($"Subscription {_subscriptionId}. Getting data for billing period {billingPeriodName}");
                 var response = _client.UsageDetails.ListByBillingPeriodAsync(billingPeriodName);
 
                 do
                 {
                     var result = await response;
                     usageDetails.AddRange(result.ToList());
-                    Console.WriteLine($"Obtaining Billing information, done {result.Count()} records received, total {usageDetails.Count}");
+                    Console.WriteLine($"Subscription {_subscriptionId}. Obtaining Billing information, done {result.Count()} records received, total {usageDetails.Count}");
 
                     if (string.IsNullOrEmpty(result.NextPageLink)) break;
 

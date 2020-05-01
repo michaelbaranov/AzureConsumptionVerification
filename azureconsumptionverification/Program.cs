@@ -1,28 +1,36 @@
 ﻿using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Azure.Management.ResourceManager.Fluent;
+using Microsoft.VisualBasic.FileIO;
 using Mono.Options;
 
 namespace AzureConsumptionVerification
 {
     internal class Program
     {
-        private static void Main(string[] args)
+        private static async Task<int> Main(string[] args)
         {
             var clientId = string.Empty;
             var clientSecret = string.Empty;
             var tenantId = string.Empty;
-            var subscriptionId = string.Empty;
             var showHelp = false;
             var numberOfMonthsToAnalyze = 1;
             var outputFolder = Path.GetTempPath();
             var openReport = false;
+            var subscription = string.Empty;
+            var numberOfSubscriptionsToAnalyzeInParallel = 5;
 
             var optionSet = new OptionSet()
                 .Add("clientId=", o => clientId = o)
                 .Add("clientSecret=", o => clientSecret = o)
                 .Add("tenantId=", o => tenantId = o)
-                .Add("subscriptionId=", o => subscriptionId = o)
+                .Add("subscription=", o => subscription = o)
                 .Add("numberOfMonths=", o => numberOfMonthsToAnalyze = int.Parse(o))
                 .Add("outputFolder=", o => outputFolder = o)
                 .Add("openReport", o => openReport = o != null)
@@ -33,34 +41,93 @@ namespace AzureConsumptionVerification
             if (showHelp)
             {
                 ShowHelp();
-                return;
+                return 0;
             }
 
-            if (string.IsNullOrEmpty(subscriptionId))
+            if (string.IsNullOrEmpty(subscription))
             {
                 Console.WriteLine("Mandatory parameter -subscriptionId is missing");
                 ShowHelp();
-                return;
+                return -1;
             }
 
             var credentials = new CustomCredentials(clientId, clientSecret, tenantId);
-            var consumption = new ConsumptionProvider(credentials, subscriptionId);
-            var usageDetails = consumption.GetConsumptionAsync(numberOfMonthsToAnalyze).GetAwaiter().GetResult();
 
-            var consumptionAnalyzer = new ConsumptionAnalyzer(new ActivityLogProvider(credentials, subscriptionId));
-            var report = consumptionAnalyzer.AnalyzeConsumptionForDeletedResources(usageDetails).GetAwaiter()
-                .GetResult();
+            var subscriptions = await GetSubscriptions(subscription, credentials);
 
-            var reportFile = Path.Combine(outputFolder, $"consumption_{subscriptionId}.csv");
-            
-            CsvReporter.WriteReport(report, reportFile);
+            await Process(credentials, subscriptions, numberOfMonthsToAnalyze, outputFolder, numberOfSubscriptionsToAnalyzeInParallel);
 
             // Open report
-            if (openReport)
+            //if (openReport)
+            //{
+            //    var process = new Process { StartInfo = new ProcessStartInfo(reportFile) { UseShellExecute = true } };
+            //    process.Start();
+            //}
+
+            return 0;
+        }
+
+        private static async Task<ConcurrentQueue<string>> GetSubscriptions(string subscription, CustomCredentials credentials)
+        {
+            ConcurrentQueue<string> subscriptions = null;
+
+            if (subscription == "all")
             {
-                var process = new Process { StartInfo = new ProcessStartInfo(reportFile) { UseShellExecute = true } };
-                process.Start();
+                await ResourceManager.Configure()
+                    .Authenticate(credentials.ToAzureCredentials())
+                    .Subscriptions
+                    .ListAsync(true)
+                    .ContinueWith(c =>
+                        subscriptions =
+                            new ConcurrentQueue<string>(c.Result.Select(s => s.SubscriptionId)));
             }
+            else
+            {
+                subscriptions = new ConcurrentQueue<string>(subscription.Split(','));
+            }
+
+            return subscriptions;
+        }
+
+        private static async Task Process(CustomCredentials credentials, ConcurrentQueue<string> subscriptions, int numberOfMonthsToAnalyze, string outputFolder,
+            int numberOfSubscriptionsToAnalyzeInParallel)
+        {
+            var threads = new List<Task>(numberOfSubscriptionsToAnalyzeInParallel);
+            var subscriptionsTotal = subscriptions.Count;
+            var processed = 0;
+            for (var i = 0; i < numberOfSubscriptionsToAnalyzeInParallel; i++)
+            {
+                threads.Add(Task.Run((() =>
+                {
+                    while (subscriptions.TryDequeue(out var subscriptionId))
+                    {
+                        try
+                        {
+                            var consumption = new ConsumptionProvider(credentials, subscriptionId);
+                            var usageDetails = consumption.GetConsumptionAsync(numberOfMonthsToAnalyze).GetAwaiter().GetResult();
+
+                            var consumptionAnalyzer = new ConsumptionAnalyzer(new ActivityLogProvider(credentials, subscriptionId), subscriptionId);
+                            var report = consumptionAnalyzer.AnalyzeConsumptionForDeletedResources(usageDetails).GetAwaiter()
+                                .GetResult();
+
+                            var reportFile = Path.Combine(outputFolder, $"consumption_{subscriptionId}.csv");
+
+                            CsvReporter.WriteReport(report, reportFile);
+                            processed++;
+                        }
+                        catch (Exception exception)
+                        {
+                            Console.WriteLine($"Exception while processing {subscriptionId}");
+                            Console.WriteLine(exception);
+                        }
+                    }
+                })));
+            }
+
+            using var timer = new Timer(data =>
+                Console.WriteLine($"Processed ... {processed} of {subscriptionsTotal} subscriptions"), null, 0, 10000);
+
+            await Task.WhenAll(threads);
         }
 
         private static void ShowHelp()
