@@ -18,7 +18,7 @@ namespace AzureConsumptionVerification
                 $"Resource ID," +
                 $"Service Type," +
                 $"Cost," +
-                $"Currency" +
+                $"Currency," +
                 $"Billing Start," +
                 $"Billing End," +
                 $"Actual resource deletion date," +
@@ -30,7 +30,7 @@ namespace AzureConsumptionVerification
                                  $"{billedResource.Id.Replace(',', '_')}," +
                                  $"{billedResource.ConsumedService}," +
                                  $"{billedResource.PretaxCost}," +
-                                 $"{billedResource.Currency}" +
+                                 $"{billedResource.Currency}," +
                                  $"{billedResource.UsageStart}," +
                                  $"{billedResource.UsageEnd}," +
                                  $"{billedResource.ActivityDeleted}," +
