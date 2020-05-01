@@ -14,6 +14,8 @@ namespace AzureConsumptionVerification
 {
     internal class Program
     {
+        static int MaxNumberOfSubscriptionsToAnalyzeInParallel = 5;
+
         private static async Task<int> Main(string[] args)
         {
             var clientId = string.Empty;
@@ -24,7 +26,6 @@ namespace AzureConsumptionVerification
             var outputFolder = Path.GetTempPath();
             var openReport = false;
             var subscription = string.Empty;
-            var numberOfSubscriptionsToAnalyzeInParallel = 5;
 
             var optionSet = new OptionSet()
                 .Add("clientId=", o => clientId = o)
@@ -55,7 +56,7 @@ namespace AzureConsumptionVerification
 
             var subscriptions = await GetSubscriptions(subscription, credentials);
 
-            await Process(credentials, subscriptions, numberOfMonthsToAnalyze, outputFolder, numberOfSubscriptionsToAnalyzeInParallel);
+            await Process(credentials, subscriptions, numberOfMonthsToAnalyze, outputFolder);
 
             // Open report
             //if (openReport)
@@ -89,13 +90,15 @@ namespace AzureConsumptionVerification
             return subscriptions;
         }
 
-        private static async Task Process(CustomCredentials credentials, ConcurrentQueue<string> subscriptions, int numberOfMonthsToAnalyze, string outputFolder,
-            int numberOfSubscriptionsToAnalyzeInParallel)
+        private static async Task Process(CustomCredentials credentials, ConcurrentQueue<string> subscriptions, int numberOfMonthsToAnalyze, string outputFolder)
         {
-            var threads = new List<Task>(numberOfSubscriptionsToAnalyzeInParallel);
+            var processingThreads = subscriptions.Count > MaxNumberOfSubscriptionsToAnalyzeInParallel
+                ? MaxNumberOfSubscriptionsToAnalyzeInParallel
+                : subscriptions.Count;
+            var threads = new List<Task>(processingThreads);
             var subscriptionsTotal = subscriptions.Count;
             var processed = 0;
-            for (var i = 0; i < numberOfSubscriptionsToAnalyzeInParallel; i++)
+            for (var i = 0; i < processingThreads; i++)
             {
                 threads.Add(Task.Run((() =>
                 {

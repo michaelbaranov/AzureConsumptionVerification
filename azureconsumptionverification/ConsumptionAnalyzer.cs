@@ -11,7 +11,7 @@ namespace AzureConsumptionVerification
 {
     internal class ConsumptionAnalyzer
     {
-        private const int ProcessingThreads = 100;
+        private const int MaxProcessingThreads = 100;
         private const int ProcessingRetryCount = 5;
         private readonly ActivityLogProvider _activityLogProvider;
         private readonly string _subscriptionId;
@@ -39,8 +39,11 @@ namespace AzureConsumptionVerification
             var totalResources = processingPool.Count;
             Console.WriteLine($"Subscription ${_subscriptionId}. Retrieved {totalResources} resources with non-zero billing");
             // Running processing in parallel threads
-            var tasks = new List<Task>(ProcessingThreads);
-            for (var i = 0; i < ProcessingThreads; i++)
+            var processingThreads = processingPool.Count > MaxProcessingThreads
+                ? MaxProcessingThreads
+                : processingPool.Count;
+            var tasks = new List<Task>(processingThreads);
+            for (var i = 0; i < processingThreads; i++)
             {
                 var task = Task.Run(() =>
                 {
