@@ -21,7 +21,7 @@ namespace AzureConsumptionVerification
 
         public async Task<IList<UsageDetail>> GetConsumptionAsync(int numberOfMonths)
         {
-            Console.WriteLine($"Subscription {_subscriptionId}. Obtaining Billing information, this might take a while");
+            Console.WriteLine($"Subscription {_subscriptionId}. Obtaining Billing information");
             var usageDetails = new List<UsageDetail>();
 
             for (var i = 0; i < numberOfMonths; i++)
