@@ -146,7 +146,7 @@ namespace AzureConsumptionVerification
                         }
                         catch (Exception exception)
                         {
-                            Log.Error($"Exception while processing {subscriptionId}", exception);
+                            Log.Error(exception, $"Exception while processing {subscriptionId}");
                         }
                     }
                 })));
