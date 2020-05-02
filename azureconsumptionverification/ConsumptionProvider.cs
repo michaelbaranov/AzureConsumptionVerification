@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Azure.Management.Consumption;
 using Microsoft.Azure.Management.Consumption.Models;
 using Microsoft.Rest;
+using Serilog;
 
 namespace AzureConsumptionVerification
 {
@@ -21,20 +22,20 @@ namespace AzureConsumptionVerification
 
         public async Task<IList<UsageDetail>> GetConsumptionAsync(int numberOfMonths)
         {
-            Console.WriteLine($"Subscription {_subscriptionId}. Obtaining Billing information");
+            Log.Information($"Subscription {_subscriptionId}. Obtaining Billing information");
             var usageDetails = new List<UsageDetail>();
 
             for (var i = 0; i < numberOfMonths; i++)
             {
                 var billingPeriodName = DateTime.UtcNow.AddMonths(-i).ToString("yyyyMM01");
-                Console.WriteLine($"Subscription {_subscriptionId}. Getting data for billing period {billingPeriodName}");
+                Log.Information($"Subscription {_subscriptionId}. Getting data for billing period {billingPeriodName}");
                 var response = _client.UsageDetails.ListByBillingPeriodAsync(billingPeriodName);
 
                 do
                 {
                     var result = await response;
                     usageDetails.AddRange(result.ToList());
-                    Console.WriteLine($"Subscription {_subscriptionId}. Obtaining Billing information, done {result.Count()} records received, total {usageDetails.Count}");
+                    Log.Information($"Subscription {_subscriptionId}. Obtaining Billing information, done {result.Count()} records received, total {usageDetails.Count}");
 
                     if (string.IsNullOrEmpty(result.NextPageLink)) break;
 

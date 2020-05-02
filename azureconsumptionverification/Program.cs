@@ -6,9 +6,11 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Azure.Management.Network.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent;
-using Microsoft.VisualBasic.FileIO;
 using Mono.Options;
+using Serilog;
+using Serilog.Core;
 
 namespace AzureConsumptionVerification
 {
@@ -40,6 +42,11 @@ namespace AzureConsumptionVerification
                 .Add("h|?|help", o => showHelp = o != null);
 
             optionSet.Parse(args);
+
+            Log.Logger = new LoggerConfiguration()
+                .WriteTo.Console()
+                .WriteTo.File($"log-{DateTime.UtcNow:yyyy_MM_dd_hh_mm}.txt")
+                .CreateLogger();
 
             if (showHelp)
             {
@@ -114,7 +121,7 @@ namespace AzureConsumptionVerification
                             var usageDetails = consumption.GetConsumptionAsync(numberOfMonthsToAnalyze).GetAwaiter().GetResult();
                             if (usageDetails.Count == 0)
                             {
-                                Console.WriteLine($"No billing information found for subscription {subscriptionId}");
+                                Log.Warning($"No billing information found for subscription {subscriptionId}");
                                 continue;
                             }
 
@@ -129,15 +136,14 @@ namespace AzureConsumptionVerification
                         }
                         catch (Exception exception)
                         {
-                            Console.WriteLine($"Exception while processing {subscriptionId}");
-                            Console.WriteLine(exception);
+                            Log.Error($"Exception while processing {subscriptionId}", exception);
                         }
                     }
                 })));
             }
 
             using var timer = new Timer(data =>
-                Console.WriteLine($"Processed ... {processed} of {subscriptionsTotal} subscriptions"), null, 0, 10000);
+                Log.Information($"Processed ... {processed} of {subscriptionsTotal} subscriptions"), null, 0, 10000);
 
             await Task.WhenAll(threads);
         }

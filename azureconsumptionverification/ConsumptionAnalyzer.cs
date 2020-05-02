@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Management.Consumption.Models;
+using Serilog;
 
 namespace AzureConsumptionVerification
 {
@@ -38,7 +39,7 @@ namespace AzureConsumptionVerification
                 .Where(p => p.Costs > 0)
                 .Select(t => new ProcessingTask {ResourceId = t.ResourceId}));
             var totalResources = processingPool.Count;
-            Console.WriteLine($"Subscription ${_subscriptionId}. Retrieved {totalResources} resources with non-zero billing");
+            Log.Information($"Subscription ${_subscriptionId}. Retrieved {totalResources} resources with non-zero billing");
             // Running processing in parallel threads
             var processingThreads = processingPool.Count > MaxProcessingThreads
                 ? MaxProcessingThreads
@@ -54,7 +55,7 @@ namespace AzureConsumptionVerification
                         {
                             if (task.Exceptions.Count > ProcessingRetryCount)
                             {
-                                Console.WriteLine($"Subscription ${_subscriptionId}. Failed to process {task.ResourceId}");
+                                Log.Warning($"Subscription ${_subscriptionId}. Failed to process {task.ResourceId}");
                                 continue;
                             }
 
@@ -102,7 +103,7 @@ namespace AzureConsumptionVerification
             }
 
             using var timer = new Timer(data =>
-                Console.WriteLine($"Subscription ${_subscriptionId}. Processed ... {report.Count} of {totalResources}"), null, 0, 10000);
+                Log.Information($"Subscription ${_subscriptionId}. Processed ... {report.Count} of {totalResources}"), null, 0, 10000);
 
             await Task.WhenAll(tasks);
 

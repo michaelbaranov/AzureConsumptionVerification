@@ -41,7 +41,7 @@ namespace AzureConsumptionVerification
         public static string MergeReports(string path)
         {
             var files = Directory.GetFiles(path);
-            var finalReportFileName = Path.Combine(path, $"analysis_result_{DateTime.UtcNow:yyyy_mm_dd_hh_mm}.csv");
+            var finalReportFileName = Path.Combine(path, $"analysis_result_{DateTime.UtcNow:yyyy_MM_dd_hh_mm}.csv");
 
             // Write header
             using var anyReport = File.OpenText(files[0]);
