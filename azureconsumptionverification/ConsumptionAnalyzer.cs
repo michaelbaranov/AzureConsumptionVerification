@@ -22,7 +22,8 @@ namespace AzureConsumptionVerification
             _subscriptionId = subscriptionId;
         }
 
-        public async Task<ConsumptionAnalysisReport> AnalyzeConsumptionForDeletedResources(IList<UsageDetail> usage)
+        public async Task<ConsumptionAnalysisReport> AnalyzeConsumptionForDeletedResources(IList<UsageDetail> usage,
+            bool onlyWithOverages)
         {
             var report = new ConsumptionAnalysisReport();
 
@@ -60,7 +61,13 @@ namespace AzureConsumptionVerification
                             // Delete event is missing for some resources, so use resource group deletion date
                             var deleteActivity = _activityLogProvider.GetResourceDeletionDate(task.ResourceId) ??
                                                  _activityLogProvider.GetResourceGroupDeletionDate(GetResourceGroupName(task.ResourceId));
-                            
+
+                            if (onlyWithOverages &&
+                                 !usage.Any(r => r.InstanceId == task.ResourceId && r.UsageStart > deleteActivity?.Date))
+                            {
+                                continue;
+                            }
+
                             // Calculate overage as sum of billing records for dates past deletion
                             report.AddResource(new BilledResources
                             {

@@ -26,6 +26,7 @@ namespace AzureConsumptionVerification
             var outputFolder = Path.GetTempPath();
             var openReport = false;
             var subscription = string.Empty;
+            bool onlyWithOverages = false;
 
             var optionSet = new OptionSet()
                 .Add("clientId=", o => clientId = o)
@@ -35,6 +36,7 @@ namespace AzureConsumptionVerification
                 .Add("numberOfMonths=", o => numberOfMonthsToAnalyze = int.Parse(o))
                 .Add("outputFolder=", o => outputFolder = o)
                 .Add("openReport", o => openReport = o != null)
+                .Add("onlyWithOverages", o => onlyWithOverages = true)
                 .Add("h|?|help", o => showHelp = o != null);
 
             optionSet.Parse(args);
@@ -56,7 +58,7 @@ namespace AzureConsumptionVerification
 
             var subscriptions = await GetSubscriptions(subscription, credentials);
 
-            await Process(credentials, subscriptions, numberOfMonthsToAnalyze, outputFolder);
+            await Process(credentials, subscriptions, numberOfMonthsToAnalyze, outputFolder, onlyWithOverages);
 
             var reportFile = CsvReporter.MergeReports(outputFolder);
             // Open report
@@ -91,7 +93,8 @@ namespace AzureConsumptionVerification
             return subscriptions;
         }
 
-        private static async Task Process(CustomCredentials credentials, ConcurrentQueue<string> subscriptions, int numberOfMonthsToAnalyze, string outputFolder)
+        private static async Task Process(CustomCredentials credentials, ConcurrentQueue<string> subscriptions, int numberOfMonthsToAnalyze, string outputFolder, 
+            bool onlyWithOverages)
         {
             var processingThreads = subscriptions.Count > MaxNumberOfSubscriptionsToAnalyzeInParallel
                 ? MaxNumberOfSubscriptionsToAnalyzeInParallel
@@ -116,7 +119,7 @@ namespace AzureConsumptionVerification
                             }
 
                             var consumptionAnalyzer = new ConsumptionAnalyzer(new ActivityLogProvider(credentials, subscriptionId), subscriptionId);
-                            var report = consumptionAnalyzer.AnalyzeConsumptionForDeletedResources(usageDetails).GetAwaiter()
+                            var report = consumptionAnalyzer.AnalyzeConsumptionForDeletedResources(usageDetails, onlyWithOverages).GetAwaiter()
                                 .GetResult();
 
                             var reportFile = Path.Combine(outputFolder, $"consumption_{subscriptionId}.csv");
