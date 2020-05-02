@@ -61,6 +61,16 @@ namespace AzureConsumptionVerification
                 return -1;
             }
 
+            if (!Directory.Exists(outputFolder))
+            {
+                Directory.CreateDirectory(outputFolder);
+            }
+            else if (Directory.GetFiles(outputFolder).Length > 0)
+            {
+                Console.WriteLine("Output directory is not empty");
+                return -1;
+            }
+
             var credentials = new CustomCredentials(clientId, clientSecret, tenantId);
 
             var subscriptions = await GetSubscriptions(subscription, credentials);
