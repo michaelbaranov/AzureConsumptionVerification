@@ -90,13 +90,14 @@ namespace AzureConsumptionVerification
                                         .Sum(o => o.PretaxCost)
                             });
                         }
-                        catch (Exception e)
+                        catch (Exception exception)
                         {
                             // Activity API sometimes fails with timeouts, need to retry
                             task.Exceptions.Add(e);
                             // Cooldown API
                             Thread.Sleep((int)TimeSpan.FromMinutes(5).TotalMilliseconds);
                             processingPool.Enqueue(task);
+                            Log.Error(exception, $"Exception while processing resource {task.ResourceId}");
                         }
                 });
                 tasks.Add(task);
