@@ -93,7 +93,7 @@ namespace AzureConsumptionVerification
                         catch (Exception exception)
                         {
                             // Activity API sometimes fails with timeouts, need to retry
-                            task.Exceptions.Add(e);
+                            task.Exceptions.Add(exception);
                             // Cooldown API
                             Thread.Sleep((int)TimeSpan.FromMinutes(5).TotalMilliseconds);
                             processingPool.Enqueue(task);
