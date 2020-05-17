@@ -1,90 +1,82 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using Microsoft.Azure.Management.Fluent;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Threading.Tasks;
 using Microsoft.Azure.Management.Monitor.Fluent.Models;
-using Microsoft.Rest;
+using Newtonsoft.Json.Linq;
 
 namespace AzureConsumptionVerification
 {
     internal class ActivityLogProvider
     {
-        private readonly ServiceClientCredentials _credentials;
-        private readonly string _subscription;
+        private readonly CustomCredentials _credentials;
+        private readonly string _subscriptionId;
 
-        public ActivityLogProvider(ServiceClientCredentials credentials, string subscription)
+        public ActivityLogProvider(CustomCredentials credentials, string subscriptionId)
         {
             _credentials = credentials;
-            _subscription = subscription;
+            _subscriptionId = subscriptionId;
         }
 
-        private IEnumerable<IEventData> GetEventsForResource(string resourceId)
+        private async Task<IEnumerable<EventData>> GetEvents(string filter)
         {
-            return Azure
-                .Configure()
-                .Authenticate(((CustomCredentials)_credentials).ToAzureCredentials())
-                .WithSubscription(_subscription)
-                .ActivityLogs.DefineQuery()
-                .StartingFrom(DateTime.UtcNow.AddDays(-90))
-                .EndsBefore(DateTime.UtcNow)
-                .WithResponseProperties(EventDataPropertyName.EventTimestamp, EventDataPropertyName.OperationName,
-                    EventDataPropertyName.Status, EventDataPropertyName.OperationId)
-                .FilterByResource(resourceId)
-                .ExecuteAsync()
-                .ConfigureAwait(false)
-                .GetAwaiter()
-                .GetResult();
+            var select =
+                "eventName,id,resourceGroupName,resourceProviderName,operationName,status,eventTimestamp,correlationId,submissionTimestamp,level";
+            var uri =
+                new Uri(
+                    $"https://management.azure.com/subscriptions/{_subscriptionId}/providers/microsoft.insights/eventtypes/management/values?api-version=2015-04-01&$filter={filter}&$select={select}");
+            var message = new HttpRequestMessage(HttpMethod.Get, uri);
+            message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _credentials.GetToken());
+
+            var response = await RestService.SendAsync(message);
+            var jObject = JObject.Parse(response);
+            var results = new List<EventData>();
+            foreach (var eventRecord in jObject["value"].Children().ToList())
+                results.Add(eventRecord.ToObject<EventData>());
+
+            return results;
         }
 
-        private IEnumerable<IEventData> GetEventsForResourceGroup(string resourceGroupName)
+        private async Task<IEnumerable<EventData>> GetEventsForResource(string resourceId)
         {
-            return Azure
-                .Configure()
-                .Authenticate(((CustomCredentials)_credentials).ToAzureCredentials())
-                .WithSubscription(_subscription)
-                .ActivityLogs.DefineQuery()
-                .StartingFrom(DateTime.UtcNow.AddDays(-90))
-                .EndsBefore(DateTime.UtcNow)
-                .WithResponseProperties(EventDataPropertyName.EventTimestamp, EventDataPropertyName.OperationName,
-                    EventDataPropertyName.Status, EventDataPropertyName.OperationId)
-                .FilterByResourceGroup(resourceGroupName)
-                .ExecuteAsync()
-                .ConfigureAwait(false)
-                .GetAwaiter()
-                .GetResult();
+            var dateFrom = DateTime.UtcNow.AddDays(-89).ToString("yyyy-MM-ddThh:mm:ssZ");
+            var dateTo = DateTime.UtcNow.ToString("yyyy-MM-ddThh:mm:ssZ");
+            var filter =
+                $"eventTimestamp ge '{dateFrom}' and eventTimestamp le '{dateTo}' and resourceId eq '{resourceId}'";
+
+            return await GetEvents(filter);
         }
 
-        public DeleteOperation GetResourceGroupDeletionDate(string resourceGroupName)
+        private async Task<IEnumerable<EventData>> GetEventsForResourceGroup(string resourceGroupName)
         {
-            var events = GetEventsForResourceGroup(resourceGroupName);
+            var dateFrom = DateTime.UtcNow.AddDays(-89).ToString("yyyy-MM-ddThh:mm:ssZ");
+            var dateTo = DateTime.UtcNow.ToString("yyyy-MM-ddThh:mm:ssZ");
+            var filter =
+                $"eventTimestamp ge '{dateFrom}' and eventTimestamp le '{dateTo}' and resourceGroupName eq '{resourceGroupName}'";
+
+            return await GetEvents(filter);
+        }
+
+        public async Task<EventData> GetResourceGroupDeletionDate(string resourceGroupName)
+        {
+            var events = await GetEventsForResourceGroup(resourceGroupName);
             var deleteEvents = events.Where(e =>
-                string.Equals(e.OperationName.Value, "Microsoft.Resources/subscriptions/resourcegroups/delete", StringComparison.OrdinalIgnoreCase)
+                string.Equals(e.OperationName.Value, "Microsoft.Resources/subscriptions/resourcegroups/delete",
+                    StringComparison.OrdinalIgnoreCase)
                 && e.Status.Value == "Succeeded").ToList();
 
-            var eventData = deleteEvents.FirstOrDefault();
-
-            return eventData == null
-                ? null
-                : new DeleteOperation { OperationId = eventData.OperationId, Date = eventData.EventTimestamp };
+            return deleteEvents.FirstOrDefault();
         }
 
-        public DeleteOperation GetResourceDeletionDate(string resourceId)
+        public async Task<EventData> GetResourceDeletionDate(string resourceId)
         {
-            var events = GetEventsForResource(resourceId);
+            var events = await GetEventsForResource(resourceId);
             var deleteEvents = events.Where(e =>
                 e.OperationName.Value.EndsWith("delete") && e.Status.Value == "Succeeded").ToList();
 
-            var eventData = deleteEvents.FirstOrDefault();
-
-            return eventData == null
-                ? null
-                : new DeleteOperation {OperationId = eventData.OperationId, Date = eventData.EventTimestamp};
+            return deleteEvents.FirstOrDefault();
         }
-    }
-
-    internal class DeleteOperation
-    {
-        public DateTime? Date;
-        public string OperationId;
     }
 }

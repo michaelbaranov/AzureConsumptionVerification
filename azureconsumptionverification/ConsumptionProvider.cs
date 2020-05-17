@@ -11,8 +11,8 @@ namespace AzureConsumptionVerification
 {
     public class ConsumptionProvider
     {
-        private readonly string _subscriptionId;
         private readonly ConsumptionManagementClient _client;
+        private readonly string _subscriptionId;
 
         public ConsumptionProvider(ServiceClientCredentials credentials, string subscriptionId)
         {
@@ -35,7 +35,8 @@ namespace AzureConsumptionVerification
                 {
                     var result = await response;
                     usageDetails.AddRange(result.ToList());
-                    Log.Information($"Subscription {_subscriptionId}. Obtaining Billing information, done {result.Count()} records received, total {usageDetails.Count}");
+                    Log.Information(
+                        $"Subscription {_subscriptionId}. Obtaining Billing information, done {result.Count()} records received, total {usageDetails.Count}");
 
                     if (string.IsNullOrEmpty(result.NextPageLink)) break;
 

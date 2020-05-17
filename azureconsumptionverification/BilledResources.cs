@@ -1,11 +1,9 @@
 ﻿using System;
-using Microsoft.Azure.Management.ContainerRegistry.Fluent.Models;
 
 namespace AzureConsumptionVerification
 {
     internal class BilledResources
     {
-        public string SubscriptionId;
         public DateTime? ActivityDeleted;
         public string ConsumedService;
         public string Currency;
@@ -14,6 +12,7 @@ namespace AzureConsumptionVerification
         public string InstanceName;
         public decimal? Overage;
         public decimal? PretaxCost;
+        public string SubscriptionId;
         public string SubscriptionName;
         public DateTime? UsageEnd;
         public DateTime? UsageStart;
