@@ -6,17 +6,15 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Azure.Management.Network.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent;
 using Mono.Options;
 using Serilog;
-using Serilog.Core;
 
 namespace AzureConsumptionVerification
 {
     internal class Program
     {
-        static int MaxNumberOfSubscriptionsToAnalyzeInParallel = 5;
+        private static readonly int MaxNumberOfSubscriptionsToAnalyzeInParallel = 20;
 
         private static async Task<int> Main(string[] args)
         {
@@ -28,7 +26,7 @@ namespace AzureConsumptionVerification
             var outputFolder = Path.GetTempPath();
             var openReport = false;
             var subscription = string.Empty;
-            bool onlyWithOverages = false;
+            var onlyWithOverages = false;
 
             var optionSet = new OptionSet()
                 .Add("clientId=", o => clientId = o)
@@ -81,36 +79,34 @@ namespace AzureConsumptionVerification
             // Open report
             if (openReport)
             {
-                var process = new Process { StartInfo = new ProcessStartInfo(reportFile) { UseShellExecute = true } };
+                var process = new Process {StartInfo = new ProcessStartInfo(reportFile) {UseShellExecute = true}};
                 process.Start();
             }
 
             return 0;
         }
 
-        private static async Task<ConcurrentQueue<string>> GetSubscriptions(string subscription, CustomCredentials credentials)
+        private static async Task<ConcurrentQueue<string>> GetSubscriptions(string subscription,
+            CustomCredentials credentials)
         {
             ConcurrentQueue<string> subscriptions = null;
 
             if (subscription == "all")
-            {
                 await ResourceManager.Configure()
                     .Authenticate(credentials.ToAzureCredentials())
                     .Subscriptions
-                    .ListAsync(true)
+                    .ListAsync()
                     .ContinueWith(c =>
                         subscriptions =
                             new ConcurrentQueue<string>(c.Result.Select(s => s.SubscriptionId)));
-            }
             else
-            {
                 subscriptions = new ConcurrentQueue<string>(subscription.Split(','));
-            }
 
             return subscriptions;
         }
 
-        private static async Task Process(CustomCredentials credentials, ConcurrentQueue<string> subscriptions, int numberOfMonthsToAnalyze, string outputFolder, 
+        private static async Task Process(CustomCredentials credentials, ConcurrentQueue<string> subscriptions,
+            int numberOfMonthsToAnalyze, string outputFolder,
             bool onlyWithOverages)
         {
             var processingThreads = subscriptions.Count > MaxNumberOfSubscriptionsToAnalyzeInParallel
@@ -120,23 +116,25 @@ namespace AzureConsumptionVerification
             var subscriptionsTotal = subscriptions.Count;
             var processed = 0;
             for (var i = 0; i < processingThreads; i++)
-            {
-                threads.Add(Task.Run((() =>
+                threads.Add(Task.Run(() =>
                 {
                     while (subscriptions.TryDequeue(out var subscriptionId))
-                    {
                         try
                         {
                             var consumption = new ConsumptionProvider(credentials, subscriptionId);
-                            var usageDetails = consumption.GetConsumptionAsync(numberOfMonthsToAnalyze).GetAwaiter().GetResult();
+                            var usageDetails = consumption.GetConsumptionAsync(numberOfMonthsToAnalyze).GetAwaiter()
+                                .GetResult();
                             if (usageDetails.Count == 0)
                             {
                                 Log.Warning($"No billing information found for subscription {subscriptionId}");
                                 continue;
                             }
 
-                            var consumptionAnalyzer = new ConsumptionAnalyzer(new ActivityLogProvider(credentials, subscriptionId), subscriptionId);
-                            var report = consumptionAnalyzer.AnalyzeConsumptionForDeletedResources(usageDetails, onlyWithOverages).GetAwaiter()
+                            var consumptionAnalyzer =
+                                new ConsumptionAnalyzer(new ActivityLogProvider(credentials, subscriptionId),
+                                    subscriptionId);
+                            var report = consumptionAnalyzer
+                                .AnalyzeConsumptionForDeletedResources(usageDetails, onlyWithOverages).GetAwaiter()
                                 .GetResult();
 
                             var reportFile = Path.Combine(outputFolder, $"consumption_{subscriptionId}.csv");
@@ -148,9 +146,11 @@ namespace AzureConsumptionVerification
                         {
                             Log.Error(exception, $"Exception while processing {subscriptionId}");
                         }
-                    }
-                })));
-            }
+                }).ContinueWith(t =>
+                {
+                    if (!t.IsCompletedSuccessfully)
+                        Log.Error(t.Exception?.GetBaseException(), "Processing thread crashed");
+                }));
 
             using var timer = new Timer(data =>
                 Log.Information($"Processed ... {processed} of {subscriptionsTotal} subscriptions"), null, 0, 10000);
@@ -171,9 +171,11 @@ namespace AzureConsumptionVerification
                 " -outputFolder [optional, default %TEMP%] folder to save report");
             Console.WriteLine(
                 " -openReport [optional, default <empty>] switch if enabled opens generated report");
-            Console.WriteLine(" -onlyWithOverages [optional, default <empty>] switch if enabled show only resources with overages"); 
+            Console.WriteLine(
+                " -onlyWithOverages [optional, default <empty>] switch if enabled show only resources with overages");
             Console.WriteLine("Examples:");
-            Console.WriteLine("Run analysis for all subscriptions available for service principal, show only those with overages");
+            Console.WriteLine(
+                "Run analysis for all subscriptions available for service principal, show only those with overages");
             Console.WriteLine("AzureConsumptionVerification -clientId=124d8317-dd0a-47f8-b630-c4839eb1602d " +
                               "-clientSecret=ObTY9A53gEB3_TgUFICK=gqX_NedhlE- " +
                               "-tenantId=91700184-c314-4dc9-bb7e-a411df456a1e " +

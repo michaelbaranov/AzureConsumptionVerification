@@ -32,19 +32,22 @@ namespace AzureConsumptionVerification
             var processingPool = new ConcurrentQueue<ProcessingTask>(usage
                 .GroupBy(r => r.InstanceId)
                 .Select(u =>
-                    new {
+                    new
+                    {
                         ResourceId = u.First().InstanceId,
                         Costs = u.Sum(c => c.PretaxCost)
                     })
                 .Where(p => p.Costs > 0)
                 .Select(t => new ProcessingTask {ResourceId = t.ResourceId}));
             var totalResources = processingPool.Count;
-            Log.Information($"Subscription ${_subscriptionId}. Retrieved {totalResources} resources with non-zero billing");
+            Log.Information(
+                $"Subscription ${_subscriptionId}. Retrieved {totalResources} resources with non-zero billing");
             // Running processing in parallel threads
             var processingThreads = processingPool.Count > MaxProcessingThreads
                 ? MaxProcessingThreads
                 : processingPool.Count;
             var tasks = new List<Task>(processingThreads);
+            var processedCount = 0;
             for (var i = 0; i < processingThreads; i++)
             {
                 var task = Task.Run(() =>
@@ -60,12 +63,16 @@ namespace AzureConsumptionVerification
                             }
 
                             // Delete event is missing for some resources, so use resource group deletion date
-                            var deleteActivity = _activityLogProvider.GetResourceDeletionDate(task.ResourceId) ??
-                                                 _activityLogProvider.GetResourceGroupDeletionDate(GetResourceGroupName(task.ResourceId));
+                            var deleteActivity = _activityLogProvider.GetResourceDeletionDate(task.ResourceId).Result ??
+                                                 _activityLogProvider
+                                                     .GetResourceGroupDeletionDate(
+                                                         GetResourceGroupName(task.ResourceId)).Result;
 
                             if (onlyWithOverages &&
-                                 !usage.Any(r => r.InstanceId == task.ResourceId && r.UsageStart > deleteActivity?.Date))
+                                !usage.Any(r =>
+                                    r.InstanceId == task.ResourceId && r.UsageStart > deleteActivity?.EventTimestamp))
                             {
+                                processedCount++;
                                 continue;
                             }
 
@@ -81,30 +88,36 @@ namespace AzureConsumptionVerification
                                 SubscriptionName = usage.First(r => r.InstanceId == task.ResourceId).SubscriptionName,
                                 UsageStart = usage.Where(r => r.InstanceId == task.ResourceId).Min(u => u.UsageStart),
                                 UsageEnd = usage.Where(r => r.InstanceId == task.ResourceId).Max(u => u.UsageEnd),
-                                ActivityDeleted = deleteActivity?.Date,
+                                ActivityDeleted = deleteActivity?.EventTimestamp,
                                 DeleteOperationId = deleteActivity?.OperationId,
                                 Overage = deleteActivity == null
                                     ? 0
                                     : usage.Where(r =>
-                                            r.InstanceId == task.ResourceId && r.UsageStart > deleteActivity.Date)
+                                            r.InstanceId == task.ResourceId &&
+                                            r.UsageStart > deleteActivity.EventTimestamp)
                                         .Sum(o => o.PretaxCost)
                             });
+                            processedCount++;
                         }
                         catch (Exception exception)
                         {
                             // Activity API sometimes fails with timeouts, need to retry
                             task.Exceptions.Add(exception);
-                            // Cooldown API
-                            Thread.Sleep((int)TimeSpan.FromMinutes(5).TotalMilliseconds);
                             processingPool.Enqueue(task);
                             Log.Error(exception, $"Exception while processing resource {task.ResourceId}");
                         }
+                }).ContinueWith(t =>
+                {
+                    if (!t.IsCompletedSuccessfully)
+                        Log.Error(t.Exception?.GetBaseException(), "Analysis thread crashed");
                 });
                 tasks.Add(task);
             }
 
             using var timer = new Timer(data =>
-                Log.Information($"Subscription ${_subscriptionId}. Processed ... {report.Count} of {totalResources}"), null, 0, 10000);
+                    Log.Information(
+                        $"Subscription {_subscriptionId}. Processed ... {processedCount} of {totalResources}"),
+                null, 0, 10000);
 
             await Task.WhenAll(tasks);
 
@@ -118,7 +131,7 @@ namespace AzureConsumptionVerification
 
         private class ProcessingTask
         {
-            public List<Exception> Exceptions = new List<Exception>();
+            public readonly List<Exception> Exceptions = new List<Exception>();
             public string ResourceId;
         }
     }
