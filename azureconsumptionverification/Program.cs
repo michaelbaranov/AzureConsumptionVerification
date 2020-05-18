@@ -137,7 +137,7 @@ namespace AzureConsumptionVerification
                                 .AnalyzeConsumptionForDeletedResources(usageDetails, onlyWithOverages).GetAwaiter()
                                 .GetResult();
 
-                            var reportFile = Path.Combine(outputFolder, $"consumption_{subscriptionId}.csv");
+                            var reportFile = Path.Combine(outputFolder, $"consumption_{subscriptionId}_{DateTime.UtcNow:yyyy_MM_dd_hh_mm}.csv");
 
                             CsvReporter.WriteReport(report, reportFile);
                             processed++;
