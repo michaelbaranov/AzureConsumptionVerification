@@ -8,6 +8,7 @@ using Microsoft.Azure.Management.ResourceManager.Fluent;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
 using Microsoft.Rest;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace AzureConsumptionVerification
 {
@@ -69,7 +70,12 @@ namespace AzureConsumptionVerification
                         Content = new FormUrlEncodedContent(formData)
                     };
                     var response = RestService.SendAsync(message).GetAwaiter().GetResult();
-                    token = JsonConvert.DeserializeObject<Token>(response);
+                    var responseContent = response.Content.ReadAsStringAsync().Result;
+                    var jObject = JObject.Parse(responseContent);
+                    if (!response.IsSuccessStatusCode)
+                        throw new RestException("Not successful status code", response.StatusCode,
+                            jObject["code"].Value<string>(), jObject["message"].Value<string>());
+                    token = JsonConvert.DeserializeObject<Token>(responseContent);
                 }
 
             return token.AccessToken;

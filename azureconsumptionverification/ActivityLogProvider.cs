@@ -27,14 +27,31 @@ namespace AzureConsumptionVerification
             var uri =
                 new Uri(
                     $"https://management.azure.com/subscriptions/{_subscriptionId}/providers/microsoft.insights/eventtypes/management/values?api-version=2015-04-01&$filter={filter}&$select={select}");
-            var message = new HttpRequestMessage(HttpMethod.Get, uri);
-            message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _credentials.GetToken());
 
-            var response = await RestService.SendAsync(message);
-            var jObject = JObject.Parse(response);
             var results = new List<EventData>();
-            foreach (var eventRecord in jObject["value"].Children().ToList())
-                results.Add(eventRecord.ToObject<EventData>());
+            do
+            {
+                var message = new HttpRequestMessage(HttpMethod.Get, uri);
+                message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _credentials.GetToken());
+
+                var response = await RestService.SendAsync(message);
+                var responseContent = await response.Content.ReadAsStringAsync();
+                var jObject = JObject.Parse(responseContent);
+                if (!response.IsSuccessStatusCode)
+                    throw new RestException("Not successful status code", response.StatusCode,
+                        jObject["code"].Value<string>(), jObject["message"].Value<string>());
+
+                foreach (var eventRecord in jObject["value"].Children().ToList())
+                    results.Add(eventRecord.ToObject<EventData>());
+
+                var nextLink = jObject.SelectToken("nextLink") == null
+                    ? string.Empty
+                    : jObject["nextLink"].Value<string>();
+                if (string.IsNullOrEmpty(nextLink)) break;
+
+                uri = new Uri(nextLink);
+            } while (true);
+
 
             return results;
         }
@@ -45,6 +62,7 @@ namespace AzureConsumptionVerification
             var dateTo = DateTime.UtcNow.ToString("yyyy-MM-ddThh:mm:ssZ");
             var filter =
                 $"eventTimestamp ge '{dateFrom}' and eventTimestamp le '{dateTo}' and resourceId eq '{resourceId}'";
+
 
             return await GetEvents(filter);
         }
@@ -62,21 +80,27 @@ namespace AzureConsumptionVerification
         public async Task<EventData> GetResourceGroupDeletionDate(string resourceGroupName)
         {
             var events = await GetEventsForResourceGroup(resourceGroupName);
-            var deleteEvents = events.Where(e =>
-                string.Equals(e.OperationName.Value, "Microsoft.Resources/subscriptions/resourcegroups/delete",
-                    StringComparison.OrdinalIgnoreCase)
-                && e.Status.Value == "Succeeded").ToList();
 
-            return deleteEvents.FirstOrDefault();
+            // Last operation in activity log should be resource group deletion, if not - it could be still existing RG
+            var record = events.OrderByDescending(e => e.EventTimestamp).FirstOrDefault();
+            return record != null &&
+                   string.Equals(record.OperationName.Value, "Microsoft.Resources/subscriptions/resourcegroups/delete",
+                       StringComparison.OrdinalIgnoreCase) &&
+                   record.Status.Value == "Succeeded"
+                ? record
+                : null;
         }
 
         public async Task<EventData> GetResourceDeletionDate(string resourceId)
         {
             var events = await GetEventsForResource(resourceId);
-            var deleteEvents = events.Where(e =>
-                e.OperationName.Value.EndsWith("delete") && e.Status.Value == "Succeeded").ToList();
 
-            return deleteEvents.FirstOrDefault();
+            var record = events.OrderByDescending(e => e.EventTimestamp).FirstOrDefault();
+
+            // Last operation in activity log should be resource deletion, if not - we need to look for other places
+            return record != null && record.OperationName.Value.EndsWith("delete") && record.Status.Value == "Succeeded"
+                ? record
+                : null;
         }
     }
 }

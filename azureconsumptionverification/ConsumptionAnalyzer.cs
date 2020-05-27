@@ -15,11 +15,14 @@ namespace AzureConsumptionVerification
         private const int MaxProcessingThreads = 100;
         private const int ProcessingRetryCount = 5;
         private readonly ActivityLogProvider _activityLogProvider;
+        private readonly ResourceProvider _resourceProvider;
         private readonly string _subscriptionId;
 
-        public ConsumptionAnalyzer(ActivityLogProvider activityLogProvider, string subscriptionId)
+        public ConsumptionAnalyzer(ActivityLogProvider activityLogProvider, ResourceProvider resourceProvider,
+            string subscriptionId)
         {
             _activityLogProvider = activityLogProvider;
+            _resourceProvider = resourceProvider;
             _subscriptionId = subscriptionId;
         }
 
@@ -30,7 +33,7 @@ namespace AzureConsumptionVerification
 
             // Get resources with non - zero costs
             var processingPool = new ConcurrentQueue<ProcessingTask>(usage
-                .GroupBy(r => r.InstanceId)
+                .GroupBy(r => r.InstanceId.ToLowerInvariant())
                 .Select(u =>
                     new
                     {
@@ -62,13 +65,28 @@ namespace AzureConsumptionVerification
                                 continue;
                             }
 
+                            // Skip existing resources
+                            var resourceExists = _resourceProvider.IsResourceExists(task.ResourceId).Result;
+                            if (resourceExists == null)
+                            {
+                                Log.Information(
+                                    $"Item skipped. Billing Item {task.ResourceId} is not actually a resource");
+                                continue;
+                            }
+
+                            if (resourceExists.Value)
+                            {
+                                Log.Information($"Item skipped. Item {task.ResourceId} exists at the moment");
+                                continue;
+                            }
+
                             // Delete event is missing for some resources, so use resource group deletion date
                             var deleteActivity = _activityLogProvider.GetResourceDeletionDate(task.ResourceId).Result ??
                                                  _activityLogProvider
                                                      .GetResourceGroupDeletionDate(
                                                          GetResourceGroupName(task.ResourceId)).Result;
 
-                            if (onlyWithOverages &&
+                            if (deleteActivity == null || onlyWithOverages &&
                                 !usage.Any(r =>
                                     r.InstanceId == task.ResourceId && r.UsageStart > deleteActivity?.EventTimestamp))
                             {
@@ -102,9 +120,9 @@ namespace AzureConsumptionVerification
                         catch (Exception exception)
                         {
                             // Activity API sometimes fails with timeouts, need to retry
+                            Log.Error(exception, $"Exception while processing resource {task.ResourceId}, retrying");
                             task.Exceptions.Add(exception);
                             processingPool.Enqueue(task);
-                            Log.Error(exception, $"Exception while processing resource {task.ResourceId}");
                         }
                 }).ContinueWith(t =>
                 {

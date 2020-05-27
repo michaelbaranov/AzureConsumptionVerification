@@ -77,7 +77,7 @@ namespace AzureConsumptionVerification
 
             var reportFile = CsvReporter.MergeReports(outputFolder);
             // Open report
-            if (openReport)
+            if (openReport && !string.IsNullOrEmpty(reportFile))
             {
                 var process = new Process {StartInfo = new ProcessStartInfo(reportFile) {UseShellExecute = true}};
                 process.Start();
@@ -132,12 +132,14 @@ namespace AzureConsumptionVerification
 
                             var consumptionAnalyzer =
                                 new ConsumptionAnalyzer(new ActivityLogProvider(credentials, subscriptionId),
+                                    new ResourceProvider(credentials, subscriptionId),
                                     subscriptionId);
                             var report = consumptionAnalyzer
                                 .AnalyzeConsumptionForDeletedResources(usageDetails, onlyWithOverages).GetAwaiter()
                                 .GetResult();
 
-                            var reportFile = Path.Combine(outputFolder, $"consumption_{subscriptionId}_{DateTime.UtcNow:yyyy_MM_dd_hh_mm}.csv");
+                            var reportFile = Path.Combine(outputFolder,
+                                $"consumption_{subscriptionId}_{DateTime.UtcNow:yyyy_MM_dd_hh_mm}.csv");
 
                             CsvReporter.WriteReport(report, reportFile);
                             processed++;

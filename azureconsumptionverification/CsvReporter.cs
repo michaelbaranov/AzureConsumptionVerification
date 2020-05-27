@@ -1,6 +1,5 @@
 ﻿using System;
 using System.IO;
-using System.Linq;
 
 namespace AzureConsumptionVerification
 {
@@ -40,6 +39,7 @@ namespace AzureConsumptionVerification
         public static string MergeReports(string path)
         {
             var files = Directory.GetFiles(path);
+            if (files.Length == 0) return string.Empty;
             var finalReportFileName = Path.Combine(path, $"analysis_result_{DateTime.UtcNow:yyyy_MM_dd_hh_mm}.csv");
 
             // Write header
